@@ -2,7 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react';
 
 // --- CONFIGURACIÓN ---
 // 1. Reemplaza esto con tu Client ID de la app de Spotify Developer Dashboard.
-const CLIENT_ID = 'TU_CLIENT_ID_DE_SPOTIFY_AQUI'; 
+// Fix: Added explicit string type to prevent TypeScript from inferring a literal type, which caused a comparison error.
+const CLIENT_ID: string = '6c0ff52f8ca34ab2b8c3c28e0c77e566'; 
 // 2. Asegúrate de que esta URL esté en la lista de Redirect URIs en tu app de Spotify.
 const REDIRECT_URI = window.location.origin;
 const AUTH_ENDPOINT = 'https://accounts.spotify.com/authorize';
