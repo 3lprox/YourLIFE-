@@ -17,8 +17,10 @@ const SCOPES = [
 const App: React.FC = () => {
   const [token, setToken] = useState<string | null>(null);
   const [track, setTrack] = useState<any>(null);
+  const [error, setError] = useState<string | null>(null);
 
   const handleLogin = () => {
+    setError(null); // Limpiar errores previos al intentar iniciar sesión de nuevo
     const authUrl = `${AUTH_ENDPOINT}?client_id=${CLIENT_ID}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&scope=${encodeURIComponent(SCOPES)}&response_type=${RESPONSE_TYPE}&show_dialog=true`;
     window.location.href = authUrl;
   };
@@ -37,32 +39,46 @@ const App: React.FC = () => {
         },
       });
 
+      if (response.status === 401) {
+        setError("Error de autenticación. Tu sesión puede haber expirado o la URL de la aplicación no está autorizada.");
+        handleLogout();
+        return;
+      }
+
       if (response.status === 204 || response.status > 400) {
-        // No content or error (e.g., token expired)
-        if (response.status === 401) {
-            handleLogout();
-        }
         setTrack(null);
         return;
       }
       
       const data = await response.json();
       setTrack(data);
+      setError(null); // Limpiar el error si la llamada es exitosa
     } catch (error) {
       console.error("Error fetching currently playing track:", error);
+      setError("No se pudo conectar con Spotify. Revisa tu conexión a internet.");
     }
   }, []);
   
   const playbackControl = async (endpoint: string) => {
       if (!token) return;
-      await fetch(`https://api.spotify.com/v1/me/player/${endpoint}`, {
-          method: 'POST',
-          headers: {
-              Authorization: `Bearer ${token}`,
-          }
-      });
-      // Wait a moment for Spotify API to update, then refresh state
-      setTimeout(() => getCurrentlyPlaying(token), 500);
+      try {
+        const response = await fetch(`https://api.spotify.com/v1/me/player/${endpoint}`, {
+            method: 'POST',
+            headers: {
+                Authorization: `Bearer ${token}`,
+            }
+        });
+        if (response.status === 401) {
+            setError("Error de autenticación. Tu sesión puede haber expirado.");
+            handleLogout();
+            return;
+        }
+        // Espera un momento para que la API de Spotify se actualice, luego refresca el estado
+        setTimeout(() => getCurrentlyPlaying(token), 500);
+      } catch (e) {
+          console.error("Error with playback control:", e);
+          setError("Error al controlar la reproducción.");
+      }
   }
 
   useEffect(() => {
@@ -98,16 +114,18 @@ const App: React.FC = () => {
           <p className="text-lg text-gray-400 mb-8">
             Conecta tu vida. Controla tu música.
           </p>
-          {CLIENT_ID === 'TU_CLIENT_ID_DE_SPOTIFY_AQUI' ? (
-             <div className="bg-yellow-900/50 border border-yellow-400 text-yellow-300 px-4 py-3 rounded-lg relative mb-6" role="alert">
-                <strong className="font-bold">¡Acción requerida!</strong>
-                <span className="block sm:inline"> Edita el archivo `App.tsx` y añade tu `CLIENT_ID` de Spotify para continuar.</span>
+           {error && (
+             <div className="bg-red-900/50 border border-red-400 text-red-300 px-4 py-3 rounded-lg relative mb-6 text-left" role="alert">
+                <strong className="font-bold">¡Ocurrió un error!</strong>
+                <span className="block sm:inline"> {error}</span>
+                <p className="text-sm mt-2 text-red-200">
+                    <strong>Sugerencia:</strong> Asegúrate que la URL actual (`{window.location.origin}`) está añadida a tus 'Redirect URIs' en el <a href="https://developer.spotify.com/dashboard" target="_blank" rel="noopener noreferrer" className="font-bold underline hover:text-white">Dashboard de Spotify</a>.
+                </p>
             </div>
-          ) : (
-             <button onClick={handleLogin} className="bg-[#1DB954] text-white font-bold py-3 px-8 rounded-full text-lg uppercase tracking-wider hover:bg-[#1ED760] transition-transform hover:scale-105">
-                Iniciar sesión con Spotify
-             </button>
           )}
+          <button onClick={handleLogin} className="bg-[#1DB954] text-white font-bold py-3 px-8 rounded-full text-lg uppercase tracking-wider hover:bg-[#1ED760] transition-transform hover:scale-105">
+            Iniciar sesión con Spotify
+          </button>
         </div>
       </div>
     );
